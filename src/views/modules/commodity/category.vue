@@ -1,6 +1,9 @@
 <template>
   <div>
-    <el-tree :data="data" :props="defaultProps"
+    <el-button type="danger" @click="batchDelete()">批量删除</el-button>
+    <el-tree :data="data"
+             :props="defaultProps"
+             ref="categoryTree"
              show-checkbox
              :default-expanded-keys="expandedKey"
              node-key="id"
@@ -31,7 +34,7 @@
         </span>
       </span>
     </el-tree>
-    <el-dialog title="添加分类" :visible.sync="dialogVisible" width="30%">
+    <el-dialog title="添加/修改 分类" :visible.sync="dialogVisible" width="30%">
       <el-form :model="category">
         <el-form-item label="分类名">
           <el-input v-model="category.name" autocomplete="off"></el-input>
@@ -45,7 +48,7 @@
       </el-form>
       <div slot="footer" class="dialog-footer">
         <el-button @click="dialogVisible = false">取 消</el-button>
-        <el-button type="primary" @click="addCategory">确 定</el-button>
+        <el-button type="primary" @click="addOrUpdate">确 定</el-button>
       </div>
     </el-dialog>
   </div>
@@ -56,6 +59,7 @@ export default {
   data() {
     return {
       data: [],
+      dialogType: '',
       dialogVisible: false,
       category: {
         id: null,
@@ -77,7 +81,62 @@ export default {
   },
   methods: {
 
+    batchDelete() {
+      var checkedNodes = this.$refs.categoryTree.getCheckedNodes()
+      var ids = []
+      var categoryNames = []
+      for (var i = 0; i < checkedNodes.length; i++) {
+        ids.push(checkedNodes[i].id)
+        categoryNames.push(checkedNodes[i].name)
+      }
+
+      this.$confirm(`是否批量删除[${categoryNames}]菜单?`, '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        this.$http({
+          url: 'http://localhost:9090/commodity/category/delete',
+          method: 'post',
+          data: this.$http.adornData(ids, false)
+        }).then(({data}) => {
+          this.$message({
+            message: '批量删除成功OK',
+            type: 'success',
+          })
+          this.getCategories()
+        })
+      }).catch(() => {
+
+      })
+    },
+
+    addOrUpdate() {
+      if (this.dialogType === 'add') {
+        this.addCategory();
+      } else if (this.dialogType === 'edit') {
+        this.updateCategory();
+      }
+    },
+    updateCategory() {
+      var {id, name, icon, proUnit} = this.category
+      this.$http({
+        url: 'http://localhost:9090/commodity/category/update',
+        method: 'post',
+        data: this.$http.adornData({id, name, icon, proUnit}, false)
+      }).then(({data}) => {
+        this.$message({
+          message: '分类信息修改成功OK',
+          type: 'success',
+        })
+        this.dialogVisible = false;
+        this.getCategories()
+        this.expandedKey = [this.category.parentId]
+      })
+    },
+
     edit(data) {
+      this.dialogType = 'edit';
       this.dialogVisible = true;
       this.$http({
         url: `http://localhost:9090/commodity/category/info/${data.id}`,
@@ -87,6 +146,7 @@ export default {
         this.category.id = data.category.id
         this.category.icon = data.category.icon
         this.category.proUnit = data.category.proUnit
+        this.category.parentId = data.category.parentId
       })
     },
 
@@ -107,16 +167,17 @@ export default {
     },
 
     append(data) {
-    this.dialogVisible = true;
-    this.category.parentId = data.id;
-    this.category.sort = 0;
-    this.category.proUnit = '';
-    this.category.proCount = 0;
-    this.category.name = '';
-    this.category.isShow = 1;
-    this.category.id = null;
-    this.category.icon = '';
-    this.category.catLevel = data.catLevel * 1 + 1;
+      this.dialogType = 'add';
+      this.dialogVisible = true;
+      this.category.parentId = data.id;
+      this.category.sort = 0;
+      this.category.proUnit = '';
+      this.category.proCount = 0;
+      this.category.name = '';
+      this.category.isShow = 1;
+      this.category.id = null;
+      this.category.icon = '';
+      this.category.catLevel = data.catLevel * 1 + 1;
     },
 
     remove(node, data) {
